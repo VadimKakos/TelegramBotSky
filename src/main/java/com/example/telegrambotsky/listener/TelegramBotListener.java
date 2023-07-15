@@ -1,5 +1,7 @@
 package com.example.telegrambotsky.listener;
 
+import com.example.telegrambotsky.entity.NotificationTask;
+import com.example.telegrambotsky.service.NotificationTaskService;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.Message;
@@ -28,8 +30,11 @@ public class TelegramBotListener implements UpdatesListener {
     private final Pattern pattern = Pattern.compile("\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2}\\s+ ([А-я\\d\\s.,!?:]+)");
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyy HH:mm");
 
-    public TelegramBotListener(TelegramBot telegramBot) {
+    private final NotificationTaskService notificationTaskService;
+
+    public TelegramBotListener(TelegramBot telegramBot, NotificationTaskService notificationTaskService) {
         this.telegramBot = telegramBot;
+        this.notificationTaskService = notificationTaskService;
     }
 
     public void init() {
@@ -39,7 +44,8 @@ public class TelegramBotListener implements UpdatesListener {
     @Override
     public int process(List<Update> updates) {
         try {
-            updates.forEach(update -> {
+            updates.stream().filter(update -> update.message() != null)
+                    .forEach(update -> {
                 logger.info("Handles update:{}", updates);
 
                 Message message = update.message();
@@ -56,7 +62,12 @@ public class TelegramBotListener implements UpdatesListener {
                             sendMessage(chatId, "Некорректный формат даты/времени");
                         } else {
                             String txt = matcher.group(2);
-
+                            NotificationTask notificationTask = new NotificationTask();
+                            notificationTask.setId(chatId);
+                            notificationTask.setMessage(txt);
+                            notificationTask.setNotificationDateTime(dateTime);
+                            notificationTaskService.save(notificationTask);
+                            sendMessage(chatId, "Задача запланирована");
                         }
                     } else {
                         sendMessage(chatId, "Некорректный формат сообщения");
